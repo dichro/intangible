@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package Intangible;
+
+message Vector {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+};
+
+message Mesh {
+    // source_uri can be any web-retrievable URL, or a primitive under the "platonic" scheme, eg "platonic:cube". "platonic:cube", notably, out of all the possibilities, is the only actual platonic solid that can be described here, but a passing classical reference is always worthwhile, even (or especially) when incorrect. 
+    string source_uri = 1;
+    Vector rescale = 2;
+    Vector rotation = 3;
+};
+
+message Texture {
+    string source_uri = 1;
+};
+
+message Rendering {
+    Mesh mesh = 2;
+    Texture texture = 3;
+};
+
+message API {
+    // if endpoint is ws://, treat as connection to another server.
+    string endpoint = 1;
+    // TODO(dichro): standardized API IDs, to readily identify operations like transfer to another room, moving self/other, pick up/drop objects, etc.
+    string name = 2;
+    string description = 3;
+    // TODO(dichro): schema for request+reply. Avro? There appears to be no easily accessible protobuf, thrift, or json-schema IDL parser that'll work with Unity.
+};
+
+message Object {
+    string id = 1;
+    Vector position = 2;
+    Rendering rendering = 3;
+    Vector rotation = 4;
+    Vector bounding_box = 5;
+    bool removed = 6;
+    repeated API api = 7;
+};
