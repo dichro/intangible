@@ -20,6 +20,7 @@ var (
 	period         = flag.Duration("period", 30*time.Second, "Period of orbit")
 	radius         = flag.Float64("radius", 1, "Radius of orbit")
 	port           = flag.Int("port", 7777, "listening port for API requests")
+	apiAddress     = flag.String("api_address", fmt.Sprintf("localhost:%d", *port), "published address for api clients")
 )
 
 func main() {
@@ -76,7 +77,7 @@ func api(ch chan<- struct{}, name, desc string) *pb.API {
 		ch <- struct{}{}
 	})
 	return &pb.API{
-		Endpoint:    fmt.Sprintf("http://localhost:%d/%s", *port, name),
+		Endpoint:    fmt.Sprintf("http://%s/%s", *apiAddress, name),
 		Name:        name,
 		Description: desc,
 	}
