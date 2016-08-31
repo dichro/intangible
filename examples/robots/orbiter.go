@@ -42,6 +42,16 @@ func main() {
 				api(stop, "stop", "stop orbiter"),
 				api(start, "start", "start orbiter"),
 			},
+			// Moon skin from http://tf3dm.com/3d-model/moon-17150.html
+			// by Nicola Cornolti
+			Rendering: &pb.Rendering{
+				Mesh: &pb.Mesh{
+					SourceUri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/moon/moon.obj",
+				},
+				Texture: &pb.Texture{
+					SourceUri: "https://s3-us-west-1.amazonaws.com/intangible-gallery/moon/MoonMap2_2500x1250.jpg",
+				},
+			},
 		}
 		pos     = 0.0
 		running = true
