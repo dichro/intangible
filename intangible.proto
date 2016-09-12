@@ -31,6 +31,9 @@ message API {
     string name = 2;
     string description = 3;
     // TODO(dichro): schema for request+reply. Avro? There appears to be no easily accessible protobuf, thrift, or json-schema IDL parser that'll work with Unity.
+    string avro_request_schema = 4;
+    // TODO(dichro): Avro supports protocol specification, equivalent to multiple API objects. Use that? The server would be blind to the details of exposed RPCs. Does that matter? More importantly, the client would not know how many RPC options to represent without fetching and rendering schema, which seems less than ideal.
+    // TODO(dichro): responses :P
 };
 
 message Object {

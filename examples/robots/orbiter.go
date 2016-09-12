@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	pb "github.com/dichro/intangible"
+	avro "github.com/elodina/go-avro"
 	log "github.com/golang/glog"
 )
 
@@ -30,18 +32,25 @@ func main() {
 		log.Exit(err)
 	}
 	var (
-		tick   = time.Tick(*updateInterval)
-		stop   = make(chan struct{})
-		start  = make(chan struct{})
+		center  = pb.Vector{Y: 1}
+		tick    = time.Tick(*updateInterval)
+		pos     = 0.0
+		running = true
+
+		// async notification channels from incoming API calls
+		stop  = make(chan struct{})
+		start = make(chan struct{})
+		orbit = make(chan *pb.Vector)
+
+		// keep a single Object entry around and just update it, rather than re-creating
 		update = &pb.Object{
 			Id: "self",
-			Position: &pb.Vector{
-				Y: 1,
-			},
 			Api: []*pb.API{
-				api(stop, "stop", "stop orbiter"),
-				api(start, "start", "start orbiter"),
+				simpleAPI(stop, "stop", "stop orbiter"),
+				simpleAPI(start, "start", "start orbiter"),
+				vectorAPI(orbit, "orbit", "set orbit center"),
 			},
+			Position: &pb.Vector{},
 			// Moon skin from http://tf3dm.com/3d-model/moon-17150.html
 			// by Nicola Cornolti
 			Rendering: &pb.Rendering{
@@ -53,8 +62,6 @@ func main() {
 				},
 			},
 		}
-		pos     = 0.0
-		running = true
 	)
 	go http.ListenAndServe(fmt.Sprintf(":%d", *port), nil)
 	for {
@@ -63,13 +70,16 @@ func main() {
 			running = false
 		case <-start:
 			running = true
+		case v := <-orbit:
+			center = *v
 		case <-tick:
 			if !running {
 				break
 			}
 			pos += 2 * math.Pi * float64(*updateInterval) / float64(*period)
-			update.Position.X = float32(*radius * math.Sin(pos))
-			update.Position.Z = float32(*radius * math.Cos(pos))
+			update.Position.X = center.X + float32(*radius*math.Sin(pos))
+			update.Position.Y = center.Y
+			update.Position.Z = center.Z + float32(*radius*math.Cos(pos))
 			buf, err := proto.Marshal(update)
 			if err != nil {
 				log.Exit(err)
@@ -81,11 +91,54 @@ func main() {
 	}
 }
 
-func api(ch chan<- struct{}, name, desc string) *pb.API {
+// TODO(dichro): there should be a way to generate the schema from an annotated struct. Furthermore, there should probably be a predefined well-known-schema for things like this.
+const requestSchema = `{"namespace": "intangible.orbiter",
+			 "type": "record",
+			 "name": "orbit",
+			 "fields": [
+			     {"name": "x", "type": "float"},
+			     {"name": "y", "type": "float"},
+			     {"name": "z", "type": "float"}
+			 ]
+			}`
+
+var schema = avro.MustParseSchema(requestSchema)
+
+func vectorAPI(ch chan<- *pb.Vector, name, desc string) *pb.API {
+	reader := avro.NewGenericDatumReader()
+	reader.SetSchema(schema)
+	http.HandleFunc(fmt.Sprintf("/%s", name), func(w http.ResponseWriter, r *http.Request) {
+		buf, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		msg := avro.NewGenericRecord(schema)
+		decoder := avro.NewBinaryDecoder(buf)
+		if err := reader.Read(msg, decoder); err != nil {
+			log.Error(err)
+			return
+		}
+		ch <- &pb.Vector{
+			X: msg.Get("x").(float32),
+			Y: msg.Get("y").(float32),
+			Z: msg.Get("z").(float32),
+		}
+	})
+	api := api(name, desc)
+	api.AvroRequestSchema = requestSchema
+	return api
+}
+
+func simpleAPI(ch chan<- struct{}, name, desc string) *pb.API {
 	http.HandleFunc(fmt.Sprintf("/%s", name), func(w http.ResponseWriter, r *http.Request) {
 		log.Infof("called %s", name)
 		ch <- struct{}{}
 	})
+	return api(name, desc)
+}
+
+func api(name, desc string) *pb.API {
 	return &pb.API{
 		Endpoint:    fmt.Sprintf("http://%s/%s", *apiAddress, name),
 		Name:        name,
