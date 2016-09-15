@@ -7,7 +7,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/dichro/intangible/async"
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -27,17 +26,9 @@ var (
 
 func init() { prometheus.MustRegister(clientSubprotocols) }
 
-type Handler struct {
-	room *async.LatestSnapshot
-}
-
-func NewHandler(room *async.LatestSnapshot) *Handler {
-	return &Handler{room: room}
-}
-
 const subprotocol = "intangible-v0"
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (rm *Room) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sps := websocket.Subprotocols(r)
 	resp := make(http.Header)
 	if len(sps) > 0 {
@@ -58,5 +49,5 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	id := fmt.Sprint(time.Now().UnixNano())
 	conn := NewConn(id, ws)
-	conn.ConnectRoom(context.Background(), h.room)
+	conn.ConnectRoom(context.Background(), rm.state)
 }

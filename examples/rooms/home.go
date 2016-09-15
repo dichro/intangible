@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dichro/intangible/async"
 	"github.com/dichro/intangible/server"
-	"github.com/golang/protobuf/proto"
 
 	pb "github.com/dichro/intangible"
 	log "github.com/golang/glog"
@@ -20,11 +18,10 @@ var (
 
 func main() {
 	flag.Parse()
-	room := async.NewLatestSnapshot(20)
+	room := server.NewRoom("home")
 	static := []*pb.Object{
 		// Sculpture from the British Museum via Sketchfab, https://skfb.ly/BuOq
 		{
-			Id:          "sculpture",
 			BoundingBox: &pb.Vector{3, 3, 3},
 			Position:    &pb.Vector{-2, 1.5, 0},
 			Rotation:    &pb.Vector{0, 90, 0},
@@ -39,7 +36,6 @@ func main() {
 			},
 		},
 		{
-			Id:          "floor",
 			BoundingBox: &pb.Vector{X: 10, Y: 1, Z: 10},
 			Position:    &pb.Vector{Y: -0.5},
 			Rendering: &pb.Rendering{
@@ -53,7 +49,6 @@ func main() {
 			},
 		},
 		{
-			Id:          "door",
 			BoundingBox: &pb.Vector{1, 3, 1},
 			Position:    &pb.Vector{0, 1.5, 3},
 			Api: []*pb.API{{
@@ -66,16 +61,12 @@ func main() {
 		},
 	}
 	for _, obj := range static {
-		buf, err := proto.Marshal(obj)
-		if err != nil {
-			log.Fatal(err)
-		}
-		room.Update(obj.Id, 1, buf)
+		room.Place(obj)
 	}
 	if len(*httpRoot) > 0 {
 		http.Handle("/", http.FileServer(http.Dir(*httpRoot)))
 	}
-	http.Handle("/ws", server.NewHandler(room))
+	http.Handle("/ws", room)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
 		log.Fatal(err)
 	}
