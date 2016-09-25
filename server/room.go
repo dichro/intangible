@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/dichro/intangible/async"
 	"github.com/golang/protobuf/proto"
 
@@ -33,15 +35,14 @@ func NewRoom(name string) *Room {
 }
 
 // Place adds the object to this Room and returns its ID.
-func (r *Room) Place(object *pb.Object) string {
-	id := r.nextID()
-	object.Id = id
-	buf, err := proto.Marshal(object)
-	if err != nil {
-		log.Fatal(err)
+func (r *Room) Place(object *pb.Object) *Presence {
+	p := &Presence{
+		ID:      r.nextID(),
+		Room:    r,
+		version: 1,
 	}
-	r.state.Update(id, 1, buf)
-	return id
+	p.Update(object)
+	return p
 }
 
 func (r *Room) nextID() string {
@@ -50,4 +51,51 @@ func (r *Room) nextID() string {
 	id := fmt.Sprintf("%d|%d|%s", r.id, r.generation, r.name)
 	r.id++
 	return id
+}
+
+// Watch returns a channel that monitors changes in the Room. The channel may be closed unexpectedly.
+func (r *Room) Watch(ctx context.Context) <-chan []interface{} {
+	return r.state.Resync(ctx, nil)
+}
+
+// Presence handles the presence of an object in a room.
+type Presence struct {
+	ID     string
+	Object *pb.Object
+	Room   *Room
+
+	mu      sync.Mutex
+	removed bool
+	version uint64
+}
+
+func (p *Presence) nextVersion() uint64 {
+	version := p.version
+	p.version++
+	return version
+}
+
+// Update updates the state of an object.
+func (p *Presence) Update(update *pb.Object) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.removed {
+		// TODO(dichro): error? log? panic?
+		return
+	}
+	p.Object = update
+	update.Id = p.ID
+	buf, err := proto.Marshal(update)
+	if err != nil {
+		log.Fatal(err)
+	}
+	p.Room.state.Update(p.ID, p.nextVersion(), buf)
+}
+
+// Remove removes this object from its room.
+func (p *Presence) Remove() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Room.state.Delete(p.ID)
+	p.removed = true
 }
