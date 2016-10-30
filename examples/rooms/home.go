@@ -75,7 +75,7 @@ func main() {
 	if len(*httpRoot) > 0 {
 		http.Handle("/", http.FileServer(http.Dir(*httpRoot)))
 	}
-	http.Handle("/ws", room)
+	http.Handle("/ws", server.NewWebsocketHandler(room))
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
 		log.Fatal(err)
 	}

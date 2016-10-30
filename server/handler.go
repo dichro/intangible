@@ -28,7 +28,16 @@ func init() { prometheus.MustRegister(clientSubprotocols) }
 
 const subprotocol = "intangible-v0"
 
-func (rm *Room) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// WebsocketHandler handles websocket connections from clients.
+type WebsocketHandler struct {
+	c Connecter
+}
+
+func NewWebsocketHandler(room Connecter) *WebsocketHandler {
+	return &WebsocketHandler{room}
+}
+
+func (h *WebsocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sps := websocket.Subprotocols(r)
 	resp := make(http.Header)
 	if len(sps) > 0 {
@@ -49,5 +58,5 @@ func (rm *Room) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	id := fmt.Sprint(time.Now().UnixNano())
 	conn := NewConn(id, ws)
-	conn.ConnectRoom(context.Background(), rm.state)
+	conn.Connect(context.Background(), h.c)
 }
