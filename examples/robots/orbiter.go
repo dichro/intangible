@@ -55,10 +55,10 @@ func main() {
 			// by Nicola Cornolti
 			Rendering: &pb.Rendering{
 				Mesh: &pb.Mesh{
-					SourceUri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/moon/moon.obj",
+					Source: &pb.Source{Uri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/moon/moon.obj"},
 				},
 				Texture: &pb.Texture{
-					SourceUri: "https://s3-us-west-1.amazonaws.com/intangible-gallery/moon/MoonMap2_2500x1250.jpg",
+					Source: &pb.Source{Uri: "https://s3-us-west-1.amazonaws.com/intangible-gallery/moon/MoonMap2_2500x1250.jpg"},
 				},
 			},
 		}

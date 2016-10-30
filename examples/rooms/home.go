@@ -27,11 +27,23 @@ func main() {
 			Rotation:    &pb.Vector{0, 90, 0},
 			Rendering: &pb.Rendering{
 				Mesh: &pb.Mesh{
-					SourceUri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/sculpt.obj",
-					Rotation:  &pb.Vector{-90, 53, 0},
+					Source:   &pb.Source{Uri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/sculpt.obj"},
+					Rotation: &pb.Vector{-90, 53, 0},
 				},
 				Texture: &pb.Texture{
-					SourceUri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/tex_0.jpg",
+					Source: &pb.Source{Uri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/tex_0.jpg"},
+				},
+			},
+		},
+		{
+			BoundingBox: &pb.Vector{3, 3, 3},
+			Position:    &pb.Vector{2, 1.5, 0},
+			Rendering: &pb.Rendering{
+				Mesh: &pb.Mesh{
+					Source: &pb.Source{
+						Uri:     "extincteur_obj.obj",
+						Archive: &pb.Source{Uri: "http://www.oyonale.com/downloads/extincteur_obj.zip"},
+					},
 				},
 			},
 		},
@@ -40,11 +52,8 @@ func main() {
 			Position:    &pb.Vector{Y: -0.5},
 			Rendering: &pb.Rendering{
 				Mesh: &pb.Mesh{
-					SourceUri: "platonic:cube",
-					Rescale:   &pb.Vector{X: 10, Y: 1, Z: 10},
-				},
-				Texture: &pb.Texture{
-					SourceUri: "colour:grey",
+					Source:  &pb.Source{Uri: "unit:cube"},
+					Rescale: &pb.Vector{X: 10, Y: 1, Z: 10},
 				},
 			},
 		},
