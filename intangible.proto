@@ -32,6 +32,7 @@ message Texture {
 message Rendering {
     Mesh mesh = 2;
     Texture texture = 3;
+    WavefrontOBJ obj = 4;
 };
 
 message API {
@@ -54,4 +55,13 @@ message Object {
     Vector bounding_box = 5;
     bool removed = 6;
     repeated API api = 7;
+};
+
+message WavefrontOBJ {
+    // obj is a Wavefront .OBJ mesh file.
+    Source obj = 1;
+    // mtls lists material files referenced by obj.
+    map<string, Source> mtls = 2;
+    // maps lists texture files referenced by obj.
+    map<string, Source> maps = 3;
 };
