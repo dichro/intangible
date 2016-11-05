@@ -33,6 +33,7 @@ message Rendering {
     Mesh mesh = 2;
     Texture texture = 3;
     WavefrontOBJ obj = 4;
+    UnitGeometry geom = 5;
 };
 
 message API {
@@ -64,4 +65,14 @@ message WavefrontOBJ {
     map<string, Source> mtls = 2;
     // maps lists texture files referenced by obj.
     map<string, Source> maps = 3;
+};
+
+message UnitGeometry {
+    enum Form {
+        CUBE = 0;
+        CYLINDER = 1;
+        SPHERE = 2;
+    }
+    Form form = 1;
+    Vector rescale = 2;
 };
