@@ -29,6 +29,7 @@ type Connecter interface {
 
 func (c *Conn) Connect(ctx context.Context, room Connecter) {
 	defer c.conn.Close()
+	defer log.Infof("ending connect", c.id)
 	g, ctx := errgroup.WithContext(ctx)
 	in := make(chan *pb.Object)
 	g.Go(func() error { return c.pullLoop(ctx, in) })
@@ -40,6 +41,7 @@ func (c *Conn) Connect(ctx context.Context, room Connecter) {
 }
 
 func (c *Conn) pushLoop(ctx context.Context, ch <-chan []byte) error {
+	defer log.Infof("ending pushLoop %s", c.id)
 	for msg := range ch {
 		if err := c.conn.WriteMessage(websocket.BinaryMessage, msg); err != nil {
 			return err
@@ -49,6 +51,7 @@ func (c *Conn) pushLoop(ctx context.Context, ch <-chan []byte) error {
 }
 
 func (c *Conn) pullLoop(ctx context.Context, ch chan<- *pb.Object) error {
+	defer log.Infof("ending pullLoop %s", c.id)
 	for {
 		_, p, err := c.conn.ReadMessage()
 		if err != nil {
