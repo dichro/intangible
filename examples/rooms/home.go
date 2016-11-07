@@ -26,12 +26,8 @@ func main() {
 			Position:    &pb.Vector{-2, 1.5, 0},
 			Rotation:    &pb.Vector{0, 90, 0},
 			Rendering: &pb.Rendering{
-				Mesh: &pb.Mesh{
-					Source:   &pb.Source{Uri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/sculpt.obj"},
-					Rotation: &pb.Vector{-90, 53, 0},
-				},
-				Texture: &pb.Texture{
-					Source: &pb.Source{Uri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/tex_0.jpg"},
+				Obj: &pb.WavefrontOBJ{
+					Obj: &pb.Source{Uri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/sculpt.obj"},
 				},
 			},
 		},
@@ -39,8 +35,8 @@ func main() {
 			BoundingBox: &pb.Vector{3, 3, 3},
 			Position:    &pb.Vector{2, 1.5, 0},
 			Rendering: &pb.Rendering{
-				Mesh: &pb.Mesh{
-					Source: &pb.Source{
+				Obj: &pb.WavefrontOBJ{
+					Obj: &pb.Source{
 						Uri:     "extincteur_obj.obj",
 						Archive: &pb.Source{Uri: "http://www.oyonale.com/downloads/extincteur_obj.zip"},
 					},
@@ -51,8 +47,8 @@ func main() {
 			BoundingBox: &pb.Vector{X: 10, Y: 1, Z: 10},
 			Position:    &pb.Vector{Y: -0.5},
 			Rendering: &pb.Rendering{
-				Mesh: &pb.Mesh{
-					Source:  &pb.Source{Uri: "unit:cube"},
+				Unit: &pb.UnitGeometry{
+					Form:    pb.UnitGeometry_CUBE,
 					Rescale: &pb.Vector{X: 10, Y: 1, Z: 10},
 				},
 			},
@@ -62,7 +58,7 @@ func main() {
 			Position:    &pb.Vector{0, 1.5, 3},
 			Api: []*pb.API{{
 				// ws: endpoints are interpreted as connections to new rooms
-				Endpoint:    "ws://intangible.gallery/",
+				Endpoint:    "ws://intangible.gallery/portal/start",
 				Name:        "teleport",
 				Description: "teleport to gallery",
 			}},
@@ -75,7 +71,7 @@ func main() {
 	if len(*httpRoot) > 0 {
 		http.Handle("/", http.FileServer(http.Dir(*httpRoot)))
 	}
-	http.Handle("/ws", server.NewWebsocketHandler(room))
+	http.Handle("/portal/start", server.NewWebsocketHandler(room))
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
 		log.Fatal(err)
 	}

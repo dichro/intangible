@@ -15,25 +15,11 @@ message Source {
     // TODO(dichro): include download size and hash.
 };
 
-message Mesh {
-    reserved 1;
-    reserved "source_uri";
-    Source source = 4;
-    Vector rescale = 2;
-    Vector rotation = 3;
-};
-
-message Texture {
-    reserved 1;
-    reserved "source_uri";
-    Source source = 4;
-};
-
 message Rendering {
-    Mesh mesh = 2;
-    Texture texture = 3;
+    reserved 2, 3;
+    reserved "mesh", "texture";
     WavefrontOBJ obj = 4;
-    UnitGeometry geom = 5;
+    UnitGeometry unit = 5;
 };
 
 message API {
