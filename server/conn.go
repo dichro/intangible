@@ -29,7 +29,7 @@ type Connecter interface {
 
 func (c *Conn) Connect(ctx context.Context, room Connecter) {
 	defer c.conn.Close()
-	defer log.Infof("ending connect", c.id)
+	defer log.Infof("ending connect %s", c.id)
 	g, ctx := errgroup.WithContext(ctx)
 	in := make(chan *pb.Object)
 	g.Go(func() error { return c.pullLoop(ctx, in) })
