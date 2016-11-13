@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/gorilla/securecookie"
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -19,6 +20,10 @@ var (
 		WriteBufferSize: 1024,
 		CheckOrigin:     func(*http.Request) bool { return true },
 	}
+	cookie = securecookie.New(
+		securecookie.GenerateRandomKey(64),
+		securecookie.GenerateRandomKey(32),
+	)
 	clientSubprotocols = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "websocket_client_subprotocols",
@@ -43,11 +48,18 @@ func NewWebsocketHandler(room Connecter) *WebsocketHandler {
 	}
 }
 
+const cookieName = "presence"
+
 func (h *WebsocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	id := fmt.Sprint(time.Now().UnixNano())
+	encoded, err := cookie.Encode(cookieName, id)
+	if err != nil {
+		log.Error(err)
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
-		Name:  "presence",
-		Value: id,
+		Name:  cookieName,
+		Value: encoded,
 		Path:  "/",
 	})
 	resp := w.Header()
@@ -69,4 +81,24 @@ func (h *WebsocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	conn := NewConn(id, ws)
 	conn.Connect(context.Background(), h.c)
+}
+
+// ID is the context key used to store the connection ID
+const ID = "id"
+
+// HandlerFunc wraps an http.HandlerFunc to attach the connection ID to the HTTP request context.
+func HandlerFunc(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c, err := r.Cookie(cookieName)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		var id string
+		if err = cookie.Decode(cookieName, c.Value, &id); err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		h(w, r.WithContext(context.WithValue(r.Context(), ID, id)))
+	}
 }
