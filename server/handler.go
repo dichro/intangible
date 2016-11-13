@@ -14,7 +14,11 @@ import (
 )
 
 var (
-	upgrader           = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
+	upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     func(*http.Request) bool { return true },
+	}
 	clientSubprotocols = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "websocket_client_subprotocols",
@@ -34,29 +38,35 @@ type WebsocketHandler struct {
 }
 
 func NewWebsocketHandler(room Connecter) *WebsocketHandler {
-	return &WebsocketHandler{room}
+	return &WebsocketHandler{
+		c: room,
+	}
 }
 
 func (h *WebsocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	id := fmt.Sprint(time.Now().UnixNano())
+	http.SetCookie(w, &http.Cookie{
+		Name:  "presence",
+		Value: id,
+		Path:  "/",
+	})
+	resp := w.Header()
 	sps := websocket.Subprotocols(r)
-	resp := make(http.Header)
 	if len(sps) > 0 {
 		for _, sp := range sps {
-			// TODO(dichro): can labels contain bad data? Should I URI-escape?
-			clientSubprotocols.WithLabelValues(sp).Inc()
 			if sp == subprotocol {
+				clientSubprotocols.WithLabelValues(sp).Inc()
 				resp.Set("Sec-Websocket-Protocol", sp)
 			}
 		}
 	} else {
 		clientSubprotocols.WithLabelValues("none").Inc()
 	}
-	ws, err := upgrader.Upgrade(w, r, resp)
+	ws, err := upgrader.Upgrade(w, r, w.Header())
 	if err != nil {
 		log.Error(err)
 		return
 	}
-	id := fmt.Sprint(time.Now().UnixNano())
 	conn := NewConn(id, ws)
 	conn.Connect(context.Background(), h.c)
 }
