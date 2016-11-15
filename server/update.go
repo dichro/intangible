@@ -9,77 +9,87 @@ import (
 )
 
 var (
-	// Apply errors
+	// ErrDifferentID is returned when the key for an Update in a Snapshot doesn't match the Update's ID.
 	ErrDifferentID = errors.New("different ID in merge")
-	ErrNotObject   = errors.New("existing value in map is not a *Object")
-	ErrRollback    = errors.New("can't apply older version to newer one")
+	// ErrNotObject is returned when a Snapshot unexpectedly contains something other than a *Update.
+	ErrNotObject = errors.New("existing value in map is not a *Update")
+	// ErrRollback is returned when an Update is applied to a Snapshot that already contains an Update for the same key with a later version.
+	ErrRollback = errors.New("can't apply older version to newer one")
 )
 
 // Update implements async.Update for async.UpdateMaps of *Updates.
 type Update struct {
 	version uint64
-	o       *pb.Object
+	obj     *pb.Object
 }
 
+// NewUpdate returns a new Update wrapping the provided update protobuf.
 func NewUpdate(version uint64, update *pb.Object) *Update {
 	return &Update{version, update}
 }
 
+// NewDelete returns an Update that destroys the provided ID.
 func NewDelete(id string) *Update {
 	return &Update{
-		o: &pb.Object{
+		obj: &pb.Object{
 			Id:      id,
 			Removed: true,
 		},
 	}
 }
 
-func (o *Update) Proto() *pb.Object {
-	return o.o
+// ID returns the object ID that this Update applies to.
+func (u *Update) ID() string { return u.obj.Id }
+
+// Proto returns this Update as a protobuf.
+func (u *Update) Proto() *pb.Object {
+	return u.obj
 }
 
-// Update applies this Object to an UpdateMap that contains *Object values. If the map already contains a matching ID, a copy of the existing Object is made, updated, and re-inserted into the map.
-func (o *Update) Apply(m async.Snapshot) error {
-	ref, ok := m[o.o.Id]
+// Apply applies this Update to an async.Snapshot. If the map already contains a matching ID, a copy of the existing Update is made, updated, and re-inserted into the map.
+func (u *Update) Apply(m async.Snapshot) error {
+	id := u.ID()
+	ref, ok := m[id]
 	if !ok {
-		m[o.o.Id] = o
+		m[id] = u
 		return nil
 	}
 	existing, ok := ref.(*Update)
 	if !ok {
 		return ErrNotObject
 	}
-	if o.o.Id != existing.o.Id {
+	if id != existing.obj.Id {
 		return ErrDifferentID
 	}
 	// removals are not versioned
-	if o.o.Removed {
-		delete(m, o.o.Id)
+	if u.obj.Removed {
+		delete(m, id)
 		return nil
 	}
-	if o.version < existing.version {
+	if u.version < existing.version {
 		return ErrRollback
 	}
 	// crude shallow copy
-	obj := *existing.o
-	if o.o.Position != nil {
-		obj.Position = o.o.Position
+	obj := *existing.obj
+	if u.obj.Position != nil {
+		obj.Position = u.obj.Position
 	}
-	if o.o.Rotation != nil {
-		obj.Rotation = o.o.Rotation
+	if u.obj.Rotation != nil {
+		obj.Rotation = u.obj.Rotation
 	}
-	if o.o.Rendering != nil {
-		obj.Rendering = o.o.Rendering
+	if u.obj.Rendering != nil {
+		obj.Rendering = u.obj.Rendering
 	}
 	x := *existing
-	x.o = &obj
-	x.version = o.version
-	m[o.o.Id] = &x
+	x.obj = &obj
+	x.version = u.version
+	m[id] = &x
 	return nil
 }
 
-func (o *Update) Exists(m async.Snapshot) bool {
-	ref, ok := m[o.o.Id]
+// Exists returns true if the provided Snapshot contains an Update with the same key and at least as old a version as this Update.
+func (u *Update) Exists(m async.Snapshot) bool {
+	ref, ok := m[u.obj.Id]
 	if !ok {
 		return false
 	}
@@ -87,5 +97,5 @@ func (o *Update) Exists(m async.Snapshot) bool {
 	if !ok {
 		return false
 	}
-	return o.version < existing.version
+	return u.version < existing.version
 }

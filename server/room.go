@@ -54,13 +54,6 @@ func (r *Room) nextID() string {
 	return id
 }
 
-/*
-// Watch returns a channel that monitors changes in the Room. The channel may be closed unexpectedly.
-func (r *Room) Watch(ctx context.Context) <-chan []interface{} {
-	return r.state.Resync(ctx, nil)
-}
-*/
-
 func (r *Room) Connect(ctx context.Context, id string, updates <-chan *pb.Object) <-chan []byte {
 	log.Infof("client %s connected", id)
 	g, ctx := errgroup.WithContext(ctx)
