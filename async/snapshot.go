@@ -6,43 +6,47 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Update is a composable update for some abstract object.
 type Update interface {
-	Update(UpdateMap) error
-	Exists(UpdateMap) bool
+	// Apply applies this Update to a Snapshot. Snapshot will be locked during this call (ie, Snapshot itself is modifiable), though values within Snapshot may not be, and should therefore be replaced, rather than modified.
+	Apply(Snapshot) error
+	// Exists returns true when the Snapshot already contains this Update.
+	Exists(Snapshot) bool
 }
 
-type UpdateMap map[string]Update
+// Snapshot is a string-keyed map of Updates.
+type Snapshot map[string]Update
 
-// LatestSnapshot maintains a snapshot of latest Versioneds.
-type LatestSnapshot struct {
+// SyncSnapshot allows clients to monitor changes to a Snapshot as Updates are applied.
+type SyncSnapshot struct {
 	// mu also protects all accesses to ring. Any call to ring that triggers a lock on its internal RWMutex is only made when holding the corresponding lock on mu.
 	mu sync.RWMutex
 	// Ring provides pubsub
 	ring   *RingBuffer
-	latest UpdateMap
+	latest Snapshot
 }
 
-// NewLatestSnapshot returns a new LatestSnapshot configured to allow subscribers to lag by at least maxBacklog updates without requiring a Resync.
-func NewLatestSnapshot(maxBacklog int) *LatestSnapshot {
-	return &LatestSnapshot{
+// NewSyncSnapshot returns a new SyncSnapshot configured to allow subscribers to lag by at least maxBacklog updates without requiring a Resync.
+func NewSyncSnapshot(maxBacklog int) *SyncSnapshot {
+	return &SyncSnapshot{
 		ring:   NewRingBuffer(maxBacklog),
-		latest: make(UpdateMap),
+		latest: make(Snapshot),
 	}
 }
 
-// Update stores this Versioned in this snapshot. No version checking is performed: caller must ensure that Update is only called in strictly incrementing version order.
-func (s *LatestSnapshot) Update(id string, update Update) error {
+// Apply applies this Update to this SyncSnapshot.
+func (s *SyncSnapshot) Apply(update Update) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := update.Update(s.latest); err != nil {
+	if err := update.Apply(s.latest); err != nil {
 		return err
 	}
 	s.ring.Push(update)
 	return nil
 }
 
-// Resync returns a channel that will stream all differences between client's latest and LatestSnapshot.
-func (s *LatestSnapshot) Resync(ctx context.Context, lastKnown UpdateMap) (updates chan []interface{}, updated UpdateMap, removed []string) {
+// Resync returns any differences this SyncSnapshot and the client's lastKnown, and a channel that will stream future updates to this SyncSnapshot.
+func (s *SyncSnapshot) Resync(ctx context.Context, lastKnown Snapshot) (updates chan []interface{}, updated Snapshot, removed []string) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -50,7 +54,7 @@ func (s *LatestSnapshot) Resync(ctx context.Context, lastKnown UpdateMap) (updat
 	updates = make(chan []interface{})
 	go s.ring.Watch(ctx, updates)
 
-	updated = make(UpdateMap)
+	updated = make(Snapshot)
 	for id, latest := range s.latest {
 		if !latest.Exists(lastKnown) {
 			updated[id] = latest
@@ -63,5 +67,7 @@ func (s *LatestSnapshot) Resync(ctx context.Context, lastKnown UpdateMap) (updat
 		}
 	}
 
+	// wait for sentinel from ringbuffer to make sure that the channel is synchronized to current state
+	<-updates
 	return
 }

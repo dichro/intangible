@@ -39,7 +39,7 @@ func (o *Update) Proto() *pb.Object {
 }
 
 // Update applies this Object to an UpdateMap that contains *Object values. If the map already contains a matching ID, a copy of the existing Object is made, updated, and re-inserted into the map.
-func (o *Update) Update(m async.UpdateMap) error {
+func (o *Update) Apply(m async.Snapshot) error {
 	ref, ok := m[o.o.Id]
 	if !ok {
 		m[o.o.Id] = o
@@ -78,7 +78,7 @@ func (o *Update) Update(m async.UpdateMap) error {
 	return nil
 }
 
-func (o *Update) Exists(m async.UpdateMap) bool {
+func (o *Update) Exists(m async.Snapshot) bool {
 	ref, ok := m[o.o.Id]
 	if !ok {
 		return false

@@ -19,7 +19,7 @@ import (
 type Room struct {
 	name       string
 	generation int64
-	state      *async.LatestSnapshot
+	state      *async.SyncSnapshot
 
 	mu sync.Mutex
 	id int
@@ -31,7 +31,7 @@ func NewRoom(name string) *Room {
 		name:       name,
 		generation: time.Now().UnixNano(),
 		// TODO(dichro): how should the queue size be decided?
-		state: async.NewLatestSnapshot(20),
+		state: async.NewSyncSnapshot(20),
 	}
 }
 
@@ -68,7 +68,7 @@ func (r *Room) Connect(ctx context.Context, id string, updates <-chan *pb.Object
 	ch := make(chan []byte)
 	g.Go(func() error { return r.push(ctx, id, ch) })
 	go func() {
-		defer r.state.Update(id, NewDelete(id))
+		defer r.state.Apply(NewDelete(id))
 		if err := g.Wait(); err != nil {
 			log.Error(err)
 		}
@@ -87,7 +87,7 @@ func (r *Room) pull(id string, updates <-chan *pb.Object) error {
 		rcvd.Id = id
 		// client can't force a bounding box
 		rcvd.BoundingBox = &pb.Vector{0.3, 0.3, 0.3}
-		r.state.Update(id, NewUpdate(nextVersion, rcvd))
+		r.state.Apply(NewUpdate(nextVersion, rcvd))
 		nextVersion++
 	}
 	return nil
@@ -102,9 +102,9 @@ func (r *Room) push(ctx context.Context, id string, ch chan<- []byte) error {
 		// updateCh is automatically re-opened and re-synchronized whenever it's closed.
 		updateCh = closed
 		// updates received from updateCh, but not synced to client
-		pending async.UpdateMap
+		pending async.Snapshot
 		// updates synced to client
-		synced = make(async.UpdateMap)
+		synced = make(async.Snapshot)
 	)
 	for {
 		select {
@@ -120,12 +120,12 @@ func (r *Room) push(ctx context.Context, id string, ch chan<- []byte) error {
 				for _, u := range add {
 					updates = append(updates, u)
 				}
-				pending = make(async.UpdateMap, len(updates))
+				pending = make(async.Snapshot, len(updates))
 				// ...and fall through to process the updates that result from the resync.
 			}
 			for _, u := range updates {
 				if u, ok := u.(async.Update); ok {
-					u.Update(pending)
+					u.Apply(pending)
 				} else {
 					log.Error("unknown update type")
 				}
@@ -143,10 +143,10 @@ func (r *Room) push(ctx context.Context, id string, ch chan<- []byte) error {
 					continue
 				}
 				ch <- buf
-				u.Update(synced)
+				u.Apply(synced)
 			}
 			// TOOD(dichro): when is it better to loop over keys and delete(pending, key) rather than recreating?
-			pending = make(async.UpdateMap)
+			pending = make(async.Snapshot)
 		case <-ctx.Done():
 			return nil
 		}
@@ -180,13 +180,13 @@ func (p *Presence) Update(update *pb.Object) {
 	}
 	p.Object = update
 	update.Id = p.ID
-	p.Room.state.Update(p.ID, NewUpdate(p.nextVersion(), update))
+	p.Room.state.Apply(NewUpdate(p.nextVersion(), update))
 }
 
 // Remove removes this object from its room.
 func (p *Presence) Remove() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.Room.state.Update(p.ID, NewDelete(p.ID))
+	p.Room.state.Apply(NewDelete(p.ID))
 	p.removed = true
 }
