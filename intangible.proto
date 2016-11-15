@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package Intangible;
+package intangible;
 
 message Vector {
     float x = 1;

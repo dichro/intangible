@@ -51,14 +51,9 @@ func main() {
 				vectorAPI(orbit, "orbit", "set orbit center"),
 			},
 			Position: &pb.Vector{},
-			// Moon skin from http://tf3dm.com/3d-model/moon-17150.html
-			// by Nicola Cornolti
 			Rendering: &pb.Rendering{
-				Mesh: &pb.Mesh{
-					Source: &pb.Source{Uri: "http://intangible-gallery.s3-website-us-west-1.amazonaws.com/moon/moon.obj"},
-				},
-				Texture: &pb.Texture{
-					Source: &pb.Source{Uri: "https://s3-us-west-1.amazonaws.com/intangible-gallery/moon/MoonMap2_2500x1250.jpg"},
+				Unit: &pb.UnitGeometry{
+					Form: pb.UnitGeometry_SPHERE,
 				},
 			},
 		}
