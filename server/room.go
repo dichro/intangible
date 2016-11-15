@@ -54,10 +54,12 @@ func (r *Room) nextID() string {
 	return id
 }
 
+/*
 // Watch returns a channel that monitors changes in the Room. The channel may be closed unexpectedly.
 func (r *Room) Watch(ctx context.Context) <-chan []interface{} {
 	return r.state.Resync(ctx, nil)
 }
+*/
 
 func (r *Room) Connect(ctx context.Context, id string, updates <-chan *pb.Object) <-chan []byte {
 	log.Infof("client %s connected", id)
@@ -66,7 +68,7 @@ func (r *Room) Connect(ctx context.Context, id string, updates <-chan *pb.Object
 	ch := make(chan []byte)
 	g.Go(func() error { return r.push(ctx, id, ch) })
 	go func() {
-		defer r.state.Delete(id)
+		defer r.state.Update(id, NewDelete(id))
 		if err := g.Wait(); err != nil {
 			log.Error(err)
 		}
@@ -85,14 +87,7 @@ func (r *Room) pull(id string, updates <-chan *pb.Object) error {
 		rcvd.Id = id
 		// client can't force a bounding box
 		rcvd.BoundingBox = &pb.Vector{0.3, 0.3, 0.3}
-		// TODO(dichro): merge into current state! Don't rely on complete picture in every update.
-
-		// Pre-prepare the protos for sending to any clients
-		buf, err := proto.Marshal(rcvd)
-		if err != nil {
-			return err
-		}
-		r.state.Update(id, nextVersion, buf)
+		r.state.Update(id, NewUpdate(nextVersion, rcvd))
 		nextVersion++
 	}
 	return nil
@@ -117,56 +112,38 @@ func (r *Room) push(ctx context.Context, id string, ch chan<- []byte) error {
 			if !ok {
 				// Throw away our pending list and re-build it by synchronizing against what we've already sent to the client.
 				log.Infof("resynchronizing %s with %d synced to client; %d pending", id, len(synced), len(pending))
-				updateCh = r.state.Resync(ctx, synced)
-				updates = <-updateCh
+				ch, add, remove := r.state.Resync(ctx, synced)
+				updateCh = ch
+				for _, id := range remove {
+					updates = append(updates, NewDelete(id))
+				}
+				for _, u := range add {
+					updates = append(updates, u)
+				}
 				pending = make(async.UpdateMap, len(updates))
-				// ...and fall through to process the first set of updates that result from the resync.
+				// ...and fall through to process the updates that result from the resync.
 			}
 			for _, u := range updates {
-				switch u, ok := u.(async.Update); {
-				case !ok:
+				if u, ok := u.(async.Update); ok {
+					u.Update(pending)
+				} else {
 					log.Error("unknown update type")
-				case id == u.ID:
-					if u.Deleted {
-						return fmt.Errorf("scene deleted self (%q)??", id)
-					}
-					// don't bother returning client's own updates.
-					synced[u.ID] = u
-				case u.Deleted:
-					// don't pass through deletes if we haven't already synced the object
-					if _, ok := synced[u.ID]; !ok {
-						delete(pending, u.ID)
-						continue
-					}
-					fallthrough
-				case u.Version != synced[u.ID].Version:
-					pending[u.ID] = u
 				}
 			}
-			for id, update := range pending {
+			for _, u := range pending {
 				// TODO(dichro): limit elapsed time/number of loop iterations to reduce backlog on updateCh?
-				var msg []byte
-				if update.Deleted {
-					var err error
-					// TODO(dichro): pre-generate msg in update.Data where possible
-					msg, err = proto.Marshal(&pb.Object{Id: id, Removed: true})
-					if err != nil {
-						log.Error(err)
-						continue
-					}
-				} else {
-					msg, ok = update.Data.([]byte)
-					if !ok {
-						log.Error("not a []byte payload in update.Data")
-						continue
-					}
+				update, ok := u.(*Update)
+				if !ok {
+					log.Error("not a *server.Update payload in update.Data")
+					continue
 				}
-				ch <- msg
-				if update.Deleted {
-					delete(synced, id)
-				} else {
-					synced[id] = update
+				buf, err := proto.Marshal(update.Proto())
+				if err != nil {
+					log.Error(err)
+					continue
 				}
+				ch <- buf
+				u.Update(synced)
 			}
 			// TOOD(dichro): when is it better to loop over keys and delete(pending, key) rather than recreating?
 			pending = make(async.UpdateMap)
@@ -203,17 +180,13 @@ func (p *Presence) Update(update *pb.Object) {
 	}
 	p.Object = update
 	update.Id = p.ID
-	buf, err := proto.Marshal(update)
-	if err != nil {
-		log.Fatal(err)
-	}
-	p.Room.state.Update(p.ID, p.nextVersion(), buf)
+	p.Room.state.Update(p.ID, NewUpdate(p.nextVersion(), update))
 }
 
 // Remove removes this object from its room.
 func (p *Presence) Remove() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.Room.state.Delete(p.ID)
+	p.Room.state.Update(p.ID, NewDelete(p.ID))
 	p.removed = true
 }
