@@ -43,8 +43,7 @@ func main() {
 		orbit = make(chan *pb.Vector)
 
 		// keep a single Object entry around and just update it, rather than re-creating
-		update = &pb.Object{
-			Id: "self",
+		update = &pb.ClientUpdate{
 			Api: []*pb.API{
 				simpleAPI(stop, "stop", "stop orbiter"),
 				simpleAPI(start, "start", "start orbiter"),

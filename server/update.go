@@ -20,18 +20,18 @@ var (
 // Update implements async.Update for async.UpdateMaps of *Updates.
 type Update struct {
 	version uint64
-	obj     *pb.Object
+	obj     *pb.ServerUpdate
 }
 
 // NewUpdate returns a new Update wrapping the provided update protobuf.
-func NewUpdate(version uint64, update *pb.Object) *Update {
+func NewUpdate(version uint64, update *pb.ServerUpdate) *Update {
 	return &Update{version, update}
 }
 
 // NewDelete returns an Update that destroys the provided ID.
 func NewDelete(id string) *Update {
 	return &Update{
-		obj: &pb.Object{
+		obj: &pb.ServerUpdate{
 			Id:      id,
 			Removed: true,
 		},
@@ -42,7 +42,7 @@ func NewDelete(id string) *Update {
 func (u *Update) ID() string { return u.obj.Id }
 
 // Proto returns this Update as a protobuf.
-func (u *Update) Proto() *pb.Object {
+func (u *Update) Proto() *pb.ServerUpdate {
 	return u.obj
 }
 

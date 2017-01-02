@@ -28,20 +28,9 @@ message API {
     // TODO(dichro): standardized API IDs, to readily identify operations like transfer to another room, moving self/other, pick up/drop objects, etc.
     string name = 2;
     string description = 3;
-    // TODO(dichro): schema for request+reply. Avro? There appears to be no easily accessible protobuf, thrift, or json-schema IDL parser that'll work with Unity.
     string avro_request_schema = 4;
     // TODO(dichro): Avro supports protocol specification, equivalent to multiple API objects. Use that? The server would be blind to the details of exposed RPCs. Does that matter? More importantly, the client would not know how many RPC options to represent without fetching and rendering schema, which seems less than ideal.
     // TODO(dichro): responses :P
-};
-
-message Object {
-    string id = 1;
-    Vector position = 2;
-    Rendering rendering = 3;
-    Vector rotation = 4;
-    Vector bounding_box = 5;
-    bool removed = 6;
-    repeated API api = 7;
 };
 
 message WavefrontOBJ {
@@ -61,4 +50,36 @@ message UnitGeometry {
     }
     Form form = 1;
     Vector rescale = 2;
+};
+
+// Streamed from client to server. Compatible with old Object type.
+message ClientUpdate {
+    Vector position = 2;
+    Vector rotation = 4;
+
+    // TODO(dichro): these should move to a registration RPC in future; this message would then just be a Pose.
+    Rendering rendering = 3;
+    repeated API api = 7;
+};
+
+message PhotonVoiceChannel {
+    string app_id = 1;
+    string app_version = 2;
+    string voice_app_id = 3;
+    string room_name = 4;
+};
+
+// Streamed from server to client. Compatible with old Object type.
+message ServerUpdate {
+    // these describe an object
+    string id = 1;
+    Vector position = 2;
+    Rendering rendering = 3;
+    Vector rotation = 4;
+    Vector bounding_box = 5;
+    bool removed = 6;
+    repeated API api = 7;
+
+    // non-object-related updates
+    PhotonVoiceChannel voice_chat = 8;
 };

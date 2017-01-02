@@ -36,7 +36,7 @@ func NewRoom(name string) *Room {
 }
 
 // Place adds the object to this Room and returns its ID.
-func (r *Room) Place(object *pb.Object) *Presence {
+func (r *Room) Place(object *pb.ServerUpdate) *Presence {
 	p := &Presence{
 		ID:      r.nextID(),
 		Room:    r,
@@ -54,7 +54,7 @@ func (r *Room) nextID() string {
 	return id
 }
 
-func (r *Room) Connect(ctx context.Context, id string, updates <-chan *pb.Object) <-chan []byte {
+func (r *Room) Connect(ctx context.Context, id string, updates <-chan *pb.ClientUpdate) <-chan []byte {
 	log.Infof("client %s connected", id)
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return r.pull(id, updates) })
@@ -72,15 +72,21 @@ func (r *Room) Connect(ctx context.Context, id string, updates <-chan *pb.Object
 	return ch
 }
 
-func (r *Room) pull(id string, updates <-chan *pb.Object) error {
+var bb = &pb.Vector{0.3, 0.3, 0.3}
+
+func (r *Room) pull(id string, updates <-chan *pb.ClientUpdate) error {
 	nextVersion := uint64(1)
 	for rcvd := range updates {
 		// TODO(dichro): validate updates
-		// force ID to match assigned
-		rcvd.Id = id
-		// client can't force a bounding box
-		rcvd.BoundingBox = &pb.Vector{0.3, 0.3, 0.3}
-		r.state.Apply(NewUpdate(nextVersion, rcvd))
+		update := &pb.ServerUpdate{
+			Id:          id,
+			BoundingBox: bb,
+			Position:    rcvd.Position,
+			Rotation:    rcvd.Rotation,
+			Api:         rcvd.Api,
+			Rendering:   rcvd.Rendering,
+		}
+		r.state.Apply(NewUpdate(nextVersion, update))
 		nextVersion++
 	}
 	return nil
@@ -149,7 +155,7 @@ func (r *Room) push(ctx context.Context, id string, ch chan<- []byte) error {
 // Presence handles the presence of an object in a room.
 type Presence struct {
 	ID     string
-	Object *pb.Object
+	Object *pb.ServerUpdate
 	Room   *Room
 
 	mu      sync.Mutex
@@ -164,7 +170,7 @@ func (p *Presence) nextVersion() uint64 {
 }
 
 // Update updates the state of an object.
-func (p *Presence) Update(update *pb.Object) {
+func (p *Presence) Update(update *pb.ServerUpdate) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.removed {

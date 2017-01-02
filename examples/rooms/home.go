@@ -19,7 +19,7 @@ var (
 func main() {
 	flag.Parse()
 	room := server.NewRoom("home")
-	static := []*pb.Object{
+	static := []*pb.ServerUpdate{
 		// Sculpture from the British Museum via Sketchfab, https://skfb.ly/BuOq
 		{
 			BoundingBox: &pb.Vector{3, 3, 3},

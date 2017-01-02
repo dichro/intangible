@@ -24,14 +24,14 @@ func NewConn(id string, conn *websocket.Conn) *Conn {
 }
 
 type Connecter interface {
-	Connect(context.Context, string, <-chan *pb.Object) <-chan []byte
+	Connect(context.Context, string, <-chan *pb.ClientUpdate) <-chan []byte
 }
 
 func (c *Conn) Connect(ctx context.Context, room Connecter) {
 	defer c.conn.Close()
 	defer log.Infof("ending connect %s", c.id)
 	g, ctx := errgroup.WithContext(ctx)
-	in := make(chan *pb.Object)
+	in := make(chan *pb.ClientUpdate)
 	g.Go(func() error { return c.pullLoop(ctx, in) })
 	out := room.Connect(ctx, c.id, in)
 	g.Go(func() error { return c.pushLoop(ctx, out) })
@@ -50,14 +50,14 @@ func (c *Conn) pushLoop(ctx context.Context, ch <-chan []byte) error {
 	return nil
 }
 
-func (c *Conn) pullLoop(ctx context.Context, ch chan<- *pb.Object) error {
+func (c *Conn) pullLoop(ctx context.Context, ch chan<- *pb.ClientUpdate) error {
 	defer log.Infof("ending pullLoop %s", c.id)
 	for {
 		_, p, err := c.conn.ReadMessage()
 		if err != nil {
 			return err
 		}
-		var rcvd pb.Object
+		var rcvd pb.ClientUpdate
 		if err = proto.Unmarshal(p, &rcvd); err != nil {
 			return err
 		}
