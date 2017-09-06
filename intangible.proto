@@ -79,6 +79,7 @@ message ServerUpdate {
     Vector bounding_box = 5;
     bool removed = 6;
     repeated API api = 7;
+    Vector rescale = 9;
 
     // non-object-related updates
     PhotonVoiceChannel voice_chat = 8;

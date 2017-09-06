@@ -1,9 +1,11 @@
 package server
 
 import (
+	"bytes"
+
 	"golang.org/x/net/context"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/sync/errgroup"
 	"github.com/gorilla/websocket"
 
@@ -43,7 +45,7 @@ func (c *Conn) Connect(ctx context.Context, room Connecter) {
 func (c *Conn) pushLoop(ctx context.Context, ch <-chan []byte) error {
 	defer log.Infof("ending pushLoop %s", c.id)
 	for msg := range ch {
-		if err := c.conn.WriteMessage(websocket.BinaryMessage, msg); err != nil {
+		if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
 			return err
 		}
 	}
@@ -58,7 +60,7 @@ func (c *Conn) pullLoop(ctx context.Context, ch chan<- *pb.ClientUpdate) error {
 			return err
 		}
 		var rcvd pb.ClientUpdate
-		if err = proto.Unmarshal(p, &rcvd); err != nil {
+		if err = jsonpb.Unmarshal(bytes.NewReader(p), &rcvd); err != nil {
 			return err
 		}
 		select {
